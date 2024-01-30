@@ -1,5 +1,7 @@
 "use strict";
 
+import {distance2Segment, makeCCW, v2} from "./vector.js";
+
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -12,6 +14,7 @@ const startEdge = [];
 
 const points = [];
 const edges = [];
+let triangles = [];
 
 const snap = 20; // pixels for edge snapping
 
@@ -50,6 +53,7 @@ function drawCalls() {
     drawAxes();
     drawPoints();
     drawEdges();
+    drawTriangles();
 }
 
 function drawAxes() {
@@ -103,6 +107,18 @@ function drawSnapRadius(canvasX, canvasY, style) {
     ctx.stroke();
 }
 
+function drawTriangles() {
+    for (const triangle of triangles) {
+        ctx.beginPath();
+        ctx.moveTo(triangle[0].x, triangle[0].y);
+        ctx.lineTo(triangle[1].x, triangle[1].y);
+        ctx.lineTo(triangle[2].x, triangle[2].y);
+        ctx.lineTo(triangle[0].x, triangle[0].y);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.fill();
+    }
+}
+
 function onMouseMove(event) {
     drawCalls();
 
@@ -119,6 +135,7 @@ function onMouseMove(event) {
     // Draw the mouse position
     if (mode === "none") {
         drawCursor(canvasX, canvasY, "white");
+        drawSnapRadius(canvasX, canvasY, "white");
     } else if (mode === "point") {
         drawCursor(canvasX, canvasY, "blue");
         drawSnapRadius(canvasX, canvasY, "cyan");
@@ -151,6 +168,11 @@ function onKeyboardEntry(event) {
         console.log("e: edge mode");
         console.log("c: cursor mode");
         console.log("right-click: delete point/edge (mode dependent)");
+    } else if (event.key === "Escape") {
+        if (startEdge.length > 0) {
+            startEdge.length = 0;
+            console.log("Edge creation cancelled.");
+        }
     }
 
     onMouseMove({ clientX, clientY });
@@ -160,8 +182,6 @@ function onClick(event) {
     const canvasX = event.clientX - canvas.offsetLeft;
     const canvasY = event.clientY - canvas.offsetTop;
 
-    console.log("Click at", canvasX, canvasY, "mode", mode, "button", event.button);
-
     // Delete point or edge
     if (event.button === 2) {
         if (mode === "point") {
@@ -169,20 +189,39 @@ function onClick(event) {
             if (closestPoint !== null && closestPoint.distance < snap) {
                 const index = points.indexOf(closestPoint.point);
                 points.splice(index, 1);
+
+// Remove any edges that contain the point
+                edges.forEach((edge, index) => {
+                    if (edge.x1 === closestPoint.point.x && edge.y1 === closestPoint.point.y || edge.x2 === closestPoint.point.x && edge.y2 === closestPoint.point.y) {
+                        edges.splice(index, 1);
+                    }
+                });
+
                 console.log("Point deleted.");
+                onEdgeChange();
             } else {
                 console.log("No point found to delete.");
             }
         } else if (mode === "edge") {
-            const closestPoint = getClosestPoint(canvasX, canvasY);
-            if (closestPoint !== null && closestPoint.distance < snap) {
-                const index = edges.findIndex(edge => {
-                    return edge.x1 === closestPoint.point.x || edge.y1 === closestPoint.point.y || edge.x2 === closestPoint.point.x || edge.y2 === closestPoint.point.y;
-                });
+            const closestEdge = edges
+                .map((edge) => {
+                    // distance between mouse and line segment
+                    return {
+                        edge: edge,
+                        distance: distance2Segment(v2(canvasX, canvasY), v2(edge.x1, edge.y1), v2(edge.x2, edge.y2))
+                    }
+                })
+                .filter((edge) => edge.distance < snap * snap)
+                .sort((a, b) =>  a.distance - b.distance)
+                .pop();
+
+            if (closestEdge !== undefined) {
+                const index = edges.indexOf(closestEdge.edge);
                 edges.splice(index, 1);
                 console.log("Edge deleted.");
+                onEdgeChange();
             } else {
-                console.log("No point found to delete.");
+                console.log("No edge found to delete.");
             }
         }
 
@@ -209,9 +248,21 @@ function onClick(event) {
             const closestPoint = getClosestPoint(canvasX, canvasY);
 
             if (closestPoint !== null && closestPoint.distance < snap) {
-                edges.push({x1: startEdge[0], y1: startEdge[1], x2: closestPoint.point.x, y2: closestPoint.point.y});
+                const newEdge = {x1: startEdge[0], y1: startEdge[1], x2: closestPoint.point.x, y2: closestPoint.point.y};
+
+                // find duplicate
+                const duplicate = edges.find((edge) => sameEdge(edge, newEdge));
+
+                if (duplicate !== undefined) {
+                    console.log("Edge already exists.");
+                    startEdge.length = 0;
+                    return;
+                }
+
+                edges.push(newEdge);
                 startEdge.length = 0;
                 console.log("Edge created.");
+                onEdgeChange();
             } else {
                 console.log("No point found to end edge at.");
             }
@@ -229,4 +280,44 @@ function getClosestPoint(canvasX, canvasY) {
         }
         return acc;
     }, null);
+}
+
+function onEdgeChange() {
+    triangles = getTriangles();
+    drawCalls();
+}
+
+function getTriangles() {
+    const triangles = [];
+
+    function hasTriangle(triangle) {
+        return triangles.some((t) => {
+            return triangle.every((point) => {
+                // The triangles have the same points
+                // yes this is inefficient
+                return t.some((p) => p.x === point.x && p.y === point.y);
+            });
+        });
+    }
+
+    for (const edge of edges) {
+        for (const vertex of points) {
+            const edge1 = {x1: edge.x1, y1: edge.y1, x2: vertex.x, y2: vertex.y};
+            const edge2 = {x1: edge.x2, y1: edge.y2, x2: vertex.x, y2: vertex.y};
+
+            if (edges.some((e) => sameEdge(e, edge1)) && edges.some((e) => sameEdge(e, edge2))) {
+                const triangle = [v2(edge.x1, edge.y1), v2(edge.x2, edge.y2), v2(vertex.x, vertex.y)];
+
+                if (!hasTriangle(triangle)) {
+                    triangles.push(makeCCW(triangle));
+                }
+            }
+        }
+    }
+
+    return triangles;
+}
+
+function sameEdge(edge, edge2) {
+    return (edge.x1 === edge2.x1 && edge.y1 === edge2.y1 && edge.x2 === edge2.x2 && edge.y2 === edge2.y2) || (edge.x1 === edge2.x2 && edge.y1 === edge2.y2 && edge.x2 === edge2.x1 && edge.y2 === edge2.y1);
 }
