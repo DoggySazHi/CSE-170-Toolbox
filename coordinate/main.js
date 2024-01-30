@@ -45,7 +45,7 @@ function initializeCanvas() {
     document.addEventListener("mousemove", onMouseMove, false);
     document.addEventListener("keydown", onKeyboardEntry, false);
     canvas.addEventListener("mousedown", onClick, false);
-    console.log("Initialized canvas. Press \"h\" for help.");
+    console.log("Initialized canvas. Press \"h\" for help.\n");
 }
 
 function drawCalls() {
@@ -249,6 +249,12 @@ function onClick(event) {
 
             if (closestPoint !== null && closestPoint.distance < snap) {
                 const newEdge = {x1: startEdge[0], y1: startEdge[1], x2: closestPoint.point.x, y2: closestPoint.point.y};
+
+                if (startEdge[0] === closestPoint.point.x && startEdge[1] === closestPoint.point.y) {
+                    console.log("Self-edge not allowed.");
+                    startEdge.length = 0;
+                    return;
+                }
 
                 // find duplicate
                 const duplicate = edges.find((edge) => sameEdge(edge, newEdge));
