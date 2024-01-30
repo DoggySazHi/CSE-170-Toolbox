@@ -17,17 +17,32 @@ const snap = 20; // pixels for edge snapping
 
 initializeCanvas();
 
+function hijackLogBecauseImLazy() {
+    console.stdlog = console.log.bind(console);
+    console.logs = [];
+    console.log = function(){
+        const logUI = document.querySelector("#logging");
+        logUI.scrollTop = logUI.scrollHeight;
+        logUI.innerHTML += Array.from(arguments).join(" ") + "\n";
+        console.stdlog.apply(console, arguments);
+    }
+}
+
 function initializeCanvas() {
+    hijackLogBecauseImLazy();
+
     const container = document.querySelector(".canvas-container");
+    container.style.height = container.clientWidth + "px";
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
+    canvas.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); };
 
     drawCalls();
 
     document.addEventListener("mousemove", onMouseMove, false);
     document.addEventListener("keydown", onKeyboardEntry, false);
-    canvas.addEventListener("click", onClick, false);
-    console.log("Initialized canvas.");
+    canvas.addEventListener("mousedown", onClick, false);
+    console.log("Initialized canvas. Press \"h\" for help.");
 }
 
 function drawCalls() {
@@ -81,6 +96,13 @@ function drawCursor(canvasX, canvasY, style) {
     ctx.fill();
 }
 
+function drawSnapRadius(canvasX, canvasY, style) {
+    ctx.beginPath();
+    ctx.arc(canvasX, canvasY, snap, 0, Math.PI * 2);
+    ctx.strokeStyle = style;
+    ctx.stroke();
+}
+
 function onMouseMove(event) {
     drawCalls();
 
@@ -99,13 +121,10 @@ function onMouseMove(event) {
         drawCursor(canvasX, canvasY, "white");
     } else if (mode === "point") {
         drawCursor(canvasX, canvasY, "blue");
+        drawSnapRadius(canvasX, canvasY, "cyan");
     } else if (mode === "edge") {
         drawCursor(canvasX, canvasY, "yellow");
-
-        ctx.beginPath();
-        ctx.arc(canvasX, canvasY, snap, 0, Math.PI * 2);
-        ctx.strokeStyle = "orange";
-        ctx.stroke();
+        drawSnapRadius(canvasX, canvasY, "orange");
     }
 
     if (startEdge.length > 0) {
@@ -120,10 +139,18 @@ function onMouseMove(event) {
 function onKeyboardEntry(event) {
     if (event.key === "p") {
         mode = "point";
+        console.log("Point mode activated.");
     } else if (event.key === "e") {
         mode = "edge";
+        console.log("Edge mode activated.");
     } else if (event.key === "c") {
         mode = "none";
+        console.log("Cursor mode activated.");
+    } else if (event.key === "h") {
+        console.log("p: point mode");
+        console.log("e: edge mode");
+        console.log("c: cursor mode");
+        console.log("right-click: delete point/edge (mode dependent)");
     }
 
     onMouseMove({ clientX, clientY });
@@ -133,7 +160,38 @@ function onClick(event) {
     const canvasX = event.clientX - canvas.offsetLeft;
     const canvasY = event.clientY - canvas.offsetTop;
 
+    console.log("Click at", canvasX, canvasY, "mode", mode, "button", event.button);
+
+    // Delete point or edge
+    if (event.button === 2) {
+        if (mode === "point") {
+            const closestPoint = getClosestPoint(canvasX, canvasY);
+            if (closestPoint !== null && closestPoint.distance < snap) {
+                const index = points.indexOf(closestPoint.point);
+                points.splice(index, 1);
+                console.log("Point deleted.");
+            } else {
+                console.log("No point found to delete.");
+            }
+        } else if (mode === "edge") {
+            const closestPoint = getClosestPoint(canvasX, canvasY);
+            if (closestPoint !== null && closestPoint.distance < snap) {
+                const index = edges.findIndex(edge => {
+                    return edge.x1 === closestPoint.point.x || edge.y1 === closestPoint.point.y || edge.x2 === closestPoint.point.x || edge.y2 === closestPoint.point.y;
+                });
+                edges.splice(index, 1);
+                console.log("Edge deleted.");
+            } else {
+                console.log("No point found to delete.");
+            }
+        }
+
+        drawCalls();
+        return;
+    }
+
     if (mode === "point") {
+        console.log("Point created.");
         points.push({ x: canvasX, y: canvasY });
     } else if (mode === "edge") {
         if (startEdge.length === 0) {
@@ -142,7 +200,10 @@ function onClick(event) {
 
             if (closestPoint !== null && closestPoint.distance < snap) {
                 startEdge.push(closestPoint.point.x, closestPoint.point.y);
+                console.log("Select second point to create edge.");
                 return;
+            } else {
+                console.log("No point found to start edge from.");
             }
         } else {
             const closestPoint = getClosestPoint(canvasX, canvasY);
@@ -150,6 +211,9 @@ function onClick(event) {
             if (closestPoint !== null && closestPoint.distance < snap) {
                 edges.push({x1: startEdge[0], y1: startEdge[1], x2: closestPoint.point.x, y2: closestPoint.point.y});
                 startEdge.length = 0;
+                console.log("Edge created.");
+            } else {
+                console.log("No point found to end edge at.");
             }
         }
     }
