@@ -31,8 +31,42 @@ function hijackLogBecauseImLazy() {
     }
 }
 
+function save() {
+    localStorage.setItem("points", JSON.stringify(points));
+    localStorage.setItem("edges", JSON.stringify(edges));
+}
+
+function load() {
+    const p = localStorage.getItem("points");
+    if (p !== null) {
+        console.log("Loaded saved points.");
+        points.push(...JSON.parse(p));
+    }
+
+    const e = localStorage.getItem("edges");
+    if (e !== null) {
+        console.log("Loaded saved edges.");
+        edges.push(...JSON.parse(e));
+    }
+}
+
+function clear() {
+    const ask = confirm("Are you sure you want to clear the canvas?");
+
+    if (!ask) {
+        return;
+    }
+
+    localStorage.removeItem("points");
+    localStorage.removeItem("edges");
+    window.location.reload();
+}
+
 function initializeCanvas() {
     hijackLogBecauseImLazy();
+
+    load();
+    triangles = getTriangles();
 
     const container = document.querySelector(".canvas-container");
     container.style.height = container.clientWidth + "px";
@@ -168,11 +202,15 @@ function onKeyboardEntry(event) {
         console.log("e: edge mode");
         console.log("c: cursor mode");
         console.log("right-click: delete point/edge (mode dependent)");
+        console.log("esc: cancel edge creation");
+        console.log("k: clear canvas");
     } else if (event.key === "Escape") {
         if (startEdge.length > 0) {
             startEdge.length = 0;
             console.log("Edge creation cancelled.");
         }
+    } else if (event.key === "k") {
+        clear();C
     }
 
     onMouseMove({ clientX, clientY });
@@ -232,6 +270,7 @@ function onClick(event) {
     if (mode === "point") {
         console.log("Point created.");
         points.push({ x: canvasX, y: canvasY });
+        save();
     } else if (mode === "edge") {
         if (startEdge.length === 0) {
             // find closest point
@@ -289,6 +328,7 @@ function getClosestPoint(canvasX, canvasY) {
 }
 
 function onEdgeChange() {
+    save();
     triangles = getTriangles();
     drawCalls();
 }
