@@ -6,6 +6,12 @@
     </head>
     <body>
         <main>
+            <div class="header">
+                <span><b>GL Coordinate converter</b></span>
+                <span>Points: <span id="points"></span></span>
+                <span>Edges: <span id="edges"></span></span>
+                <span>Triangles: <span id="triangles"></span></span>
+            </div>
             <div class="main-interface">
                 <div class="canvas-container">
                     <canvas id="drawing">
@@ -19,16 +25,22 @@
             <div class="control">
 
             </div>
-            <table>
-                <thead>
+            <div class="scroll-table">
+                <table>
+                    <thead>
                     <tr>
                         <th>X</th>
                         <th>Y</th>
+                        <th>Color</th>
                         <th>Cx</th>
                         <th>Cy</th>
                     </tr>
-                </thead>
-            </table>
+                    </thead>
+                    <tbody>
+
+                    </tbody>
+                </table>
+            </div>
         </main>
         <script src="main.js" type="module"></script>
     </body>

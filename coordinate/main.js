@@ -74,6 +74,7 @@ function initializeCanvas() {
     canvas.height = container.clientHeight;
     canvas.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); };
 
+    populateUI();
     drawCalls();
 
     document.addEventListener("mousemove", onMouseMove, false);
@@ -210,7 +211,9 @@ function onKeyboardEntry(event) {
             console.log("Edge creation cancelled.");
         }
     } else if (event.key === "k") {
-        clear();C
+        clear();
+    } else if (event.key === "d") {
+        console.log(generateArrays());
     }
 
     onMouseMove({ clientX, clientY });
@@ -236,7 +239,7 @@ function onClick(event) {
                 });
 
                 console.log("Point deleted.");
-                onEdgeChange();
+                onDataChange();
             } else {
                 console.log("No point found to delete.");
             }
@@ -257,7 +260,7 @@ function onClick(event) {
                 const index = edges.indexOf(closestEdge.edge);
                 edges.splice(index, 1);
                 console.log("Edge deleted.");
-                onEdgeChange();
+                onDataChange();
             } else {
                 console.log("No edge found to delete.");
             }
@@ -270,7 +273,7 @@ function onClick(event) {
     if (mode === "point") {
         console.log("Point created.");
         points.push({ x: canvasX, y: canvasY });
-        save();
+        onDataChange();
     } else if (mode === "edge") {
         if (startEdge.length === 0) {
             // find closest point
@@ -307,7 +310,7 @@ function onClick(event) {
                 edges.push(newEdge);
                 startEdge.length = 0;
                 console.log("Edge created.");
-                onEdgeChange();
+                onDataChange();
             } else {
                 console.log("No point found to end edge at.");
             }
@@ -327,9 +330,10 @@ function getClosestPoint(canvasX, canvasY) {
     }, null);
 }
 
-function onEdgeChange() {
+function onDataChange() {
     save();
     triangles = getTriangles();
+    populateUI();
     drawCalls();
 }
 
@@ -366,4 +370,91 @@ function getTriangles() {
 
 function sameEdge(edge, edge2) {
     return (edge.x1 === edge2.x1 && edge.y1 === edge2.y1 && edge.x2 === edge2.x2 && edge.y2 === edge2.y2) || (edge.x1 === edge2.x2 && edge.y1 === edge2.y2 && edge.x2 === edge2.x1 && edge.y2 === edge2.y1);
+}
+
+function populateUI() {
+    document.querySelector("#points").textContent = "" + points.length;
+    document.querySelector("#edges").textContent = "" + edges.length;
+    document.querySelector("#triangles").textContent = "" + triangles.length;
+
+    populateTable();
+}
+
+function populateTable() {
+    const rows = document.querySelector("tbody");
+    rows.innerHTML = "";
+
+    for (const vertex of points) {
+        const row = document.createElement("tr");
+        const x = document.createElement("td");
+        const y = document.createElement("td");
+        const color = document.createElement("td");
+        const colorInput = document.createElement("input");
+        const cx = document.createElement("td");
+        const cy = document.createElement("td");
+
+        x.textContent = vertex.x;
+        y.textContent = vertex.y;
+        cx.textContent = (vertex.x - canvas.width / 2) / canvas.width * 2;
+        cy.textContent = -(vertex.y - canvas.height / 2) / canvas.height * 2;
+
+        colorInput.type = "color";
+        colorInput.value = "#FFFF00";
+        colorInput.onchange = (e) => {
+            vertex.color = e.target.value;
+            drawCalls();
+        }
+        color.appendChild(colorInput);
+
+        row.appendChild(x);
+        row.appendChild(y);
+        row.appendChild(color);
+        row.appendChild(cx);
+        row.appendChild(cy);
+
+        rows.appendChild(row);
+    }
+}
+
+function generateArrays() {
+    let strVertex = "";
+    let strVertexColors = "";
+    let strTriangleVertices = "";
+
+    for (const vertex of points) {
+        strVertex += `\t${vertex.x}f, ${vertex.y}f, 0.0f, 0.0f\n`;
+        strVertexColors += `\t1.0f, 1.0f, 1.0f, 1.0f,\n`; // TODO color
+    }
+
+    function getVertexIndex(vertex) {
+        for (let i = 0; i < points.length; i++) {
+            if (points[i].x === vertex.x && points[i].y === vertex.y) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    for (const triangle of triangles) {
+        strTriangleVertices += `\t${getVertexIndex(triangle[0])}, ${getVertexIndex(triangle[1])}, ${getVertexIndex(triangle[2])},\n`;
+    }
+
+    return `
+GLuint box_VAO;
+GLuint box_VBO[2];
+GLuint box_EBO;
+
+float box_vertices[] = {
+${strVertex}
+};
+
+float box_colors[] = {
+${strVertexColors}
+};
+
+GLuint box_indices[] = {
+${strTriangleVertices}
+};
+    `
 }
