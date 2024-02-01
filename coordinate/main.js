@@ -213,7 +213,7 @@ function onKeyboardEntry(event) {
     } else if (event.key === "k") {
         clear();
     } else if (event.key === "d") {
-        console.log(generateArrays());
+        console.log(generateArraysWithoutEBO());
     }
 
     onMouseMove({ clientX, clientY });
@@ -416,13 +416,20 @@ function populateTable() {
     }
 }
 
-function generateArrays() {
+function generateArraysWithEBO() {
     let strVertex = "";
     let strVertexColors = "";
     let strTriangleVertices = "";
 
     for (const vertex of points) {
-        strVertex += `\t${vertex.x}f, ${vertex.y}f, 0.0f, 0.0f\n`;
+        let glX = (vertex.x - canvas.width / 2) / canvas.width * 2;
+        // truncate to three decimals
+        glX = Math.round(glX * 1000) / 1000;
+
+        let glY = -(vertex.y - canvas.height / 2) / canvas.height * 2;
+        glY = Math.round(glY * 1000) / 1000;
+
+        strVertex += `\t${glX}f, ${glY}f, 0.0f, 1.0f,\n`;
         strVertexColors += `\t1.0f, 1.0f, 1.0f, 1.0f,\n`; // TODO color
     }
 
@@ -455,6 +462,36 @@ ${strVertexColors}
 
 GLuint box_indices[] = {
 ${strTriangleVertices}
+};`
+}
+
+function generateArraysWithoutEBO() {
+    let strVertex = "";
+    let strVertexColors = "";
+
+    for (const triangle of triangles) {
+        for (const vertex of triangle) {
+            let glX = (vertex.x - canvas.width / 2) / canvas.width * 2;
+            // truncate to three decimals
+            glX = Math.round(glX * 1000) / 1000;
+
+            let glY = -(vertex.y - canvas.height / 2) / canvas.height * 2;
+            glY = Math.round(glY * 1000) / 1000;
+
+            strVertex += `\t${glX}f, ${glY}f, 0.0f, 1.0f,\n`;
+            strVertexColors += `\t1.0f, 1.0f, 1.0f, 1.0f,\n`; // TODO color
+        }
+    }
+
+    return `
+GLuint box_VAO;
+GLuint box_VBO[2];
+
+float box_vertices[] = {
+${strVertex}
 };
-    `
+
+float box_colors[] = {
+${strVertexColors}
+};`
 }

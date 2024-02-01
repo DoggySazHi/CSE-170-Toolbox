@@ -41,7 +41,7 @@ export function makeCCW(arrV) {
     const v2 = v2sub(arrV[2], arrV[0])
     const rotation = v1.x * v2.y - v1.y * v2.x; // <0, 0, 1> * ((v2 - v1) x (v3 - v1))
 
-    if (rotation > 0) {
+    if (rotation < 0) { // yay opengl right-handed coordinate system
         return arrV;
     }
 
