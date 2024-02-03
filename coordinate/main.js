@@ -80,6 +80,7 @@ function initializeCanvas() {
     document.addEventListener("mousemove", onMouseMove, false);
     document.addEventListener("keydown", onKeyboardEntry, false);
     canvas.addEventListener("mousedown", onClick, false);
+    canvas.addEventListener("mouseup", onRelease, false);
     console.log("Initialized canvas. Press \"h\" for help.\n");
 }
 
@@ -213,11 +214,13 @@ function onKeyboardEntry(event) {
     } else if (event.key === "k") {
         clear();
     } else if (event.key === "d") {
-        console.log(generateArraysWithoutEBO());
+        console.log(generateArraysWithEBO());
     }
 
     onMouseMove({ clientX, clientY });
 }
+
+let selectedPoint = null;
 
 function onClick(event) {
     const canvasX = event.clientX - canvas.offsetLeft;
@@ -276,7 +279,7 @@ function onClick(event) {
         onDataChange();
     } else if (mode === "edge") {
         if (startEdge.length === 0) {
-            // find closest point
+            // find the closest point
             const closestPoint = getClosestPoint(canvasX, canvasY);
 
             if (closestPoint !== null && closestPoint.distance < snap) {
@@ -315,9 +318,22 @@ function onClick(event) {
                 console.log("No point found to end edge at.");
             }
         }
+    } else if (mode === "none") {
+        const closestPoint = getClosestPoint(canvasX, canvasY);
+
+        if (closestPoint !== null && closestPoint.distance < snap) {
+            console.log("Selected point.");
+            selectedPoint = closestPoint.point;
+        } else {
+            console.log("No point found to select.");
+        }
     }
 
     drawCalls();
+}
+
+function onRelease(event) {
+    selectedPoint = null;
 }
 
 function getClosestPoint(canvasX, canvasY) {
@@ -408,7 +424,7 @@ function populateTable() {
 
         row.appendChild(x);
         row.appendChild(y);
-        row.appendChild(color);
+        // row.appendChild(color);
         row.appendChild(cx);
         row.appendChild(cy);
 
@@ -448,6 +464,10 @@ function generateArraysWithEBO() {
     }
 
     return `
+// Generated with https://doggysazhi.github.io/CSE-170-Toolbox/coordinate
+
+// Place this code block in your init function to generate the buffers
+
 GLuint box_VAO;
 GLuint box_VBO[2];
 GLuint box_EBO;
@@ -462,7 +482,12 @@ ${strVertexColors}
 
 GLuint box_indices[] = {
 ${strTriangleVertices}
-};`
+};
+
+// Place this code block in your draw function to draw the triangles
+glBindVertexArray(boxVAO);
+glDrawElements(GL_TRIANGLES, sizeof(box_indices) / sizeof(float), GL_UNSIGNED_INT, nullptr);
+`
 }
 
 function generateArraysWithoutEBO() {
@@ -484,6 +509,10 @@ function generateArraysWithoutEBO() {
     }
 
     return `
+// Generated with https://doggysazhi.github.io/CSE-170-Toolbox/coordinate
+
+// Place this code block in your init function to generate the buffers
+
 GLuint box_VAO;
 GLuint box_VBO[2];
 
@@ -493,5 +522,10 @@ ${strVertex}
 
 float box_colors[] = {
 ${strVertexColors}
-};`
+};
+
+// Place this code block in your draw function to draw the triangles
+glBindVertexArray(boxVAO);
+glDrawArrays(GL_TRIANGLES, 0, sizeof(box_vertices) / sizeof(float));
+`
 }
